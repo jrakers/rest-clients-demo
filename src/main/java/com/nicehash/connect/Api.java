@@ -1,19 +1,21 @@
 package com.nicehash.connect;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
-import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -21,15 +23,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 public class Api {
 
 	private static final Charset CHARSET = StandardCharsets.ISO_8859_1;
 	private static final String HMAC_SHA256 = "HmacSHA256";
 
-	private String urlRoot;
-	private String orgId;
-	private String apiKey;
-	private String apiSecret;
+	private final String urlRoot;
+	private final String orgId;
+	private final String apiKey;
+	private final String apiSecret;
 
 	public Api(String urlRoot, String orgId, String apiKey, String apiSecret) {
 		this.urlRoot = urlRoot;
@@ -54,14 +57,15 @@ public class Api {
 			segments = new ArrayList<>(segments);
 			segments.add(bodyStr.getBytes(StandardCharsets.UTF_8));
 		}
+		log.debug("segments: {}", segments);
 		return hmacSha256BySegments(key, segments);
 	}
 
 	private static String hmacSha256BySegments(String key, List<byte []> segments) {
 		try {
 			Mac mac = Mac.getInstance(HMAC_SHA256);
-			SecretKeySpec secret_key = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), HMAC_SHA256);
-			mac.init(secret_key);
+			SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), HMAC_SHA256);
+			mac.init(secretKey);
 			boolean first = true;
 
 			for (byte [] segment: segments) {
@@ -94,7 +98,9 @@ public class Api {
 
 		if (auth) {
 			String nonce  = UUID.randomUUID().toString();
-			String digest = Api.hashBySegments(this.apiSecret, this.apiKey, time, nonce, this.orgId, request.getMethod(), request.getURI().getPath(), request.getURI().getQuery(), null);
+			String digest = Api.hashBySegments(this.apiSecret, this.apiKey, time, nonce, this.orgId, request.getMethod(),
+							request.getURI().getPath(), request.getURI().getQuery(), null);
+			log.debug(digest);
 
 			request.setHeader("X-Time", time);
 			request.setHeader("X-Nonce", nonce);
